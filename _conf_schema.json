@@ -1,0 +1,8 @@
+{
+  "whitelist": {
+    "type": "list",
+    "description": "允许响应指令的群号列表",
+    "hint": "填写QQ群号，例如：[\"123456\", \"654321\"]",
+    "default": []
+  }
+}

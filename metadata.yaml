@@ -1,0 +1,6 @@
+name: 高考咨询_qa
+author: 阿咪
+desc: 高考咨询群问答插件
+help: 输入 /提问帮助 查看关键词回复帮助。 # 插件的帮助信息
+version: 1.0.0
+repository: https://github.com/zhiquan-huang/astrbot_plugin_university_qahttps

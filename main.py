@@ -6,6 +6,9 @@ import json
 import os
 from pathlib import Path
 from thefuzz import process
+# 在文件顶部添加导入语句
+from astrbot.api.message_components import Plain, Image
+import astrbot.api.message_components as Comp
 
 PLUGIN_DIR = Path(__file__).parent
 questions_DATA_PATH = PLUGIN_DIR / "questions.json"
@@ -16,25 +19,37 @@ class SZTUQAPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
         self.config = config  # 自动加载配置
-        self.questions_data = self._load_data(questions_DATA_PATH, default={})
+        self.qa_data = self._load_qa_data()
 
     
     def _check_whitelist(self, event: AstrMessageEvent) -> bool:
         group_id = event.get_group_id()
         return group_id in self.config["whitelist"]
 
-    def _load_data(self, path: str, default=None):
+    def _load_qa_data(self) -> dict:
         try:
-            with open(path, 'r', encoding='utf-8') as f:
+            # 自动创建目录和文件
+            if not os.path.exists(questions_DATA_PATH):
+                with open(questions_DATA_PATH, "w", encoding="utf-8") as f:
+                    json.dump({}, f)  # 初始化空数据库
+            # 加载数据
+            with open(questions_DATA_PATH, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except FileNotFoundError:
-            return default
-        except json.JSONDecodeError:
-            print(f"JSON 文件 {path} 解码错误，已返回默认值。")
-            return default
+            
+            # 构建完整映射：问题 -> 回答（包括别名）
+            full_qa = {}
+            for question, content in data.items():
+                if isinstance(content, dict):
+                    full_qa[question] = content
+                    # 添加别名
+                    if "aliases" in content:
+                        for alias in content["aliases"]:
+                            full_qa[alias] = content
+            return full_qa
+
         except Exception as e:
-            print(f"加载数据文件 {path} 失败: {traceback.format_exc()}")
-            return default
+            logger.error(f"加载问答数据失败: {questions_DATA_PATH} | 错误: {str(e)}")
+            return {}  # 返回空字典保证后续逻辑不崩溃
 
     @filter.command_group("咨询群聊配置")
     @filter.permission_type(filter.PermissionType.ADMIN)  # 仅管理员可操作
@@ -106,16 +121,16 @@ class SZTUQAPlugin(Star):
             answer = self.qa_data[matched_question]
             # 处理图片类型回答
             if isinstance(answer, dict) and "image" in answer:
-                image_path = answer["image"]
+                image_path = PLUGIN_DIR / answer["image"]
                 if os.path.exists(image_path):
                     chain = [
                         Comp.Plain(f"您可能想问：'{matched_question}'\n{answer['text']}"),
-                        Comp.Image.fromFileSystem(image_path)
+                        Comp.Image.fromFileSystem(str(image_path))
                     ]
                     yield event.chain_result(chain)
                 else:
                     logger.error(f"图片文件不存在: {image_path}")
-                    yield event.plain_result("图片资源加载失败，请联系管理员。")
+                    yield event.plain_result(f"{image_path}图片资源加载失败，请联系管理员。")
             else:
                 yield event.plain_result(f"您可能想问：'{matched_question}'\n{answer}")
         else:
